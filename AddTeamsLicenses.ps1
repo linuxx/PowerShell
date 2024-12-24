@@ -26,30 +26,30 @@ $users = if ($LimitOne) {
 
 foreach ($user in $users) {
     # Check license assignments for the user
-    $hasNoTeams = $user.AssignedLicenses | Where-Object { $_.SkuId -eq $noTeamsSkuId }
     $hasFullTeams = $user.AssignedLicenses | Where-Object { $_.SkuId -eq $fullTeamsSkuId }
+    $hasNoTeams = $user.AssignedLicenses | Where-Object { $_.SkuId -eq $noTeamsSkuId }
     $hasTeamsEnterprise = $user.AssignedLicenses | Where-Object { $_.SkuId -eq $teamsEnterpriseSkuId }
 
-    # Perform actions only if the user has "no Teams" license and not already "Teams Enterprise"
-    if ($hasNoTeams -and -not $hasTeamsEnterprise) {
+    # Perform actions only if the user has "Full Teams" license
+    if ($hasFullTeams) {
         Write-Host "Processing user: $($user.DisplayName) ($($user.UserPrincipalName))"
 
         if ($TestMode) {
-            Write-Host "[TEST MODE] Would remove license $noTeamsSkuId and add $teamsEnterpriseSkuId"
+            Write-Host "[TEST MODE] Would remove license $fullTeamsSkuId and add $noTeamsSkuId and $teamsEnterpriseSkuId"
         } else {
             try {
                 # Perform license swap
                 Set-MgUserLicense -UserId $user.UserPrincipalName \
-                    -AddLicenses @{ SkuId = $teamsEnterpriseSkuId } \
-                    -RemoveLicenses $noTeamsSkuId
+                    -AddLicenses @(@{ SkuId = $noTeamsSkuId }, @{ SkuId = $teamsEnterpriseSkuId }) \
+                    -RemoveLicenses $fullTeamsSkuId
                 Write-Host "Successfully swapped licenses for $($user.DisplayName)"
             } catch {
                 Write-Warning "Failed to swap licenses for $($user.DisplayName): $_"
             }
         }
-    } elseif ($hasTeamsEnterprise) {
-        Write-Host "$($user.DisplayName) already has Teams Enterprise license."
+    } elseif ($hasNoTeams -and $hasTeamsEnterprise) {
+        Write-Host "$($user.DisplayName) already has the desired licenses (No Teams and Teams Enterprise)."
     } else {
-        Write-Host "$($user.DisplayName) does not have Microsoft 365 E3 (no Teams) license or already has the correct licenses."
+        Write-Host "$($user.DisplayName) does not have Microsoft 365 E3 (Full Teams) license or already has the correct licenses."
     }
 }
